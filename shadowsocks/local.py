@@ -1,7 +1,9 @@
 import sys
 
-from gevent import monkey
-monkey.patch_all(dns=gevent.version_info[0]>=1)
+import gevent, gevent.monkey
+gevent.monkey.patch_all(dns=gevent.version_info[0]>=1)
+#from gevent import monkey
+#monkey.patch_all(dns=gevent.version_info[0]>=1)
 
 import socket
 import select
@@ -20,7 +22,6 @@ def get_table(key):
     s = m.digest()
     (a, b) = struct.unpack('<QQ', s)
     table = [c for c in string.maketrans('', '')]
-    print table
     for i in xrange(1, 1024):
         table.sort(lambda x, y: int(a % (ord(x) + i) - a % (ord(y) + i)))
     return table
@@ -40,7 +41,6 @@ class ThreadingTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):  
 
 
 class Socks5Server(SocketServer.StreamRequestHandler):
-    ''' RequesHandlerClass Definition '''
     def handle_tcp(self, sock, remote):
         try:
             fdset = [sock, remote]
@@ -62,6 +62,7 @@ class Socks5Server(SocketServer.StreamRequestHandler):
                     if result < len(data):
                         raise Exception('failed to send all data')
         finally:
+            logging.info("close tcp")
             sock.close()
             remote.close()
 
@@ -85,7 +86,9 @@ class Socks5Server(SocketServer.StreamRequestHandler):
             data = self.rfile.read(4)     # Forward request format: VER CMD RSV ATYP (4 bytes)
 
             # CMD == 0x01 (connect)
+            logging.info(data)
             mode = ord(data[1])           
+            logging.info('mode=' + str(mode))
             if mode != 1:
                 logging.warn('mode != 1')
                 return
@@ -146,6 +149,8 @@ def readConfig():
             PORT = int(value)
         elif key == '-s':
             SERVER = value
+
+    return SERVER, REMOTE_PORT, PORT, KEY 
 
 if __name__ == '__main__':
     os.chdir(os.path.dirname(__file__) or '.')

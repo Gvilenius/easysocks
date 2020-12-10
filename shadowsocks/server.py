@@ -1,6 +1,6 @@
-from gevent import monkey
-
-monkey.patch_all(dns=gevent.version_info[0]>=1)
+import sys
+import gevent, gevent.monkey
+gevent.monkey.patch_all(dns=gevent.version_info[0]>=1)
 
 import socket
 import select
@@ -19,7 +19,6 @@ def get_table(key):
     s = m.digest()
     (a, b) = struct.unpack('<QQ', s)
     table = [c for c in string.maketrans('', '')]
-    print table
     for i in xrange(1, 1024):
         table.sort(lambda x, y: int(a % (ord(x) + i) - a % (ord(y) + i)))
     return table

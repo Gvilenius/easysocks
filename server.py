@@ -46,6 +46,7 @@ class SocksProxy(StreamRequestHandler):
 
         # request
         version, cmd, _, address_type = struct.unpack("!BBBB", self.connection.recv(4))
+        logging.info("cmd="+str(cmd))
         assert version == SOCKS_VERSION
 
         if address_type == 1:  # IPv4
