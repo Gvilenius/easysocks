@@ -15,6 +15,9 @@ import os
 import json
 import logging
 import getopt
+from pyDes import des, PAD_PKCS5, ECB
+from rsa import RSA
+import numpy as np
 
 def get_table(key):
     m = hashlib.md5()
@@ -35,6 +38,25 @@ def send_all(sock, data):
         bytes_sent += r
         if bytes_sent == len(data):
             return bytes_sent
+
+
+def find_random_prime(lower_bound=1, upper_bound=20, seed=0):
+    assert (lower_bound >= 1), "Lower_bound must be no less than 1."
+    np.random.seed(seed=seed)
+    index = np.random.randint(lower_bound, upper_bound)
+
+    prime_list = []
+    
+    i = 2
+    while(True):
+        if (len(prime_list) >= index):
+            break
+        if gmpy.is_prime(i):
+            prime_list.append(i)
+        i += 1
+
+    return prime_list[index-1]
+
 
 class ThreadingTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):   # Multiple inheritance
     allow_reuse_address = True
@@ -65,12 +87,65 @@ class Socks5Server(SocketServer.StreamRequestHandler):
             logging.info("close tcp")
             sock.close()
             remote.close()
+    
+    def exchange_key(self, sock, remote):
+        self.rsa = RSA()
+        try:
+            # 1. send public key
+            pub_key = (str(self.rsa.e) + '-' + str(self.rsa.n)).encode('utf-8')
+            pub_key = pub_key
+
+            result = send_all(remote, self.encrypt(pub_key))
+            
+            # 2. receive public key
+            remote_pubkey = self.decrypt(remote.recv(4096)).decode('utf-8')
+            self.remote_pubkey = [int(k) for k in remote_pubkey.decode('utf-8').strip().split('-')]
+            logging.info("Local receive pubkey: %s" % remote_pubkey)
+
+            # 3. identification check
+            id_seq = str(np.random.randint(0,10000))
+            id_msg = '2017013684'
+            
+            id_data = self.rsa._encode(id_seq+id_msg, self.remote_pubkey[0], self.remote_pubkey[1], self.rsa.k)
+            result = send_all(remote, id_data)
+
+            id_data = remote.recv(4096).decode('utf-8')
+            id_data = self.rsa._decode(id_data, self.rsa.d, self.rsa.n, self.rsa.k)
+            id_data = id_data.strip()
+            if not id_data[:-10] == str(int(id_seq)+1):
+                raise Exception("Unknown seq")
+            if not id_data[-10:] == '2017011303':
+                raise Exception("Unknown partner")
+
+            # 4. exchange des key
+            DES_KEY = str(np.random.randint(10000000, 100000000))
+            self.des_obj = des(DES_KEY, ECB, DES_KEY, padmode=PAD_PKCS5)
+
+            __DES_KEY = DES_KEY
+            ## encrypt by private A
+            DES_KEY = self.rsa._encode(DES_KEY, self.rsa.d, self.rsa.n, self.rsa.k)
+            ## encrypt by public B
+            DES_KEY = self.rsa._encode(DES_KEY, self.remote_pubkey[0], self.remote_pubkey[1], self.rsa.k).encode('utf-8')
+
+            result = send_all(remote, DES_KEY)
+            logging.info("Client xchange complete with DES key %s" % __DES_KEY)
+
+        except:
+            logging.info("close tcp")
+            sock.close()
+            remote.close()
 
     def encrypt(self, data):
         return data.translate(encrypt_table)
 
     def decrypt(self, data):
         return data.translate(decrypt_table)
+    
+    def DES_encrypt(self, data):
+        return self.des_object.encrypt(data)
+    
+    def DES_decrypt(self, data):
+        return self.des_object.decrypt(data)
 
     def send_encrypt(self, sock, data):
         sock.send(self.encrypt(data))
@@ -81,7 +156,6 @@ class Socks5Server(SocketServer.StreamRequestHandler):
             sock.recv(262)                # Sock5 Verification packet
             sock.send("\x05\x00")         # Sock5 Response: '0x05' Version 5; '0x00' NO AUTHENTICATION REQUIRED
             # After Authentication negotiation
-
 
             data = self.rfile.read(4)     # Forward request format: VER CMD RSV ATYP (4 bytes)
 
@@ -128,6 +202,10 @@ class Socks5Server(SocketServer.StreamRequestHandler):
             except socket.error, e:
                 logging.warn(e)
                 return
+
+            # TODO
+            self.exchange_key(sock, remote)
+            
             self.handle_tcp(sock, remote)
         except socket.error, e:
             logging.warn(e)
