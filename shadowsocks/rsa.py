@@ -10,15 +10,14 @@ except ImportError as e:
 
 from pyasn1.codec.der import encoder
 from pyasn1.type.univ import *
-from bitarray import bitarray
+import sys
 
 PEM_TEMPLATE = '-----BEGIN RSA PRIVATE KEY-----\n%s-----END RSA PRIVATE KEY-----\n'
 DEFAULT_EXP = 65537
 
 
-def find_random_prime(lower_bound=1, upper_bound=20, seed=0):
+def find_random_prime(lower_bound=10, upper_bound=20):
     assert (lower_bound >= 1), "Lower_bound must be no less than 1."
-    np.random.seed(seed=seed)
     index = np.random.randint(lower_bound, upper_bound)
 
     prime_list = []
@@ -35,10 +34,16 @@ def find_random_prime(lower_bound=1, upper_bound=20, seed=0):
         
 
 class RSA:
-    def __init__(self, p=None, q=None, e=DEFAULT_EXP, k=20):
+    def __init__(self, p=None, q=None, e=None, k=20):
         """
         Initialize RSA instance using primes (p, q)
         """
+        if not p:
+            p = find_random_prime(lower_bound=800, upper_bound=1200)
+        if not q:
+            q = find_random_prime(lower_bound=800, upper_bound=1200)
+        if not e:
+            e = find_random_prime(lower_bound=800, upper_bound=1200)
 
         self.e = e
 
@@ -53,7 +58,6 @@ class RSA:
             
         
         self.n = self.p * self.q
-        self.data_split_size = len('{0:0=#b}'.format(self.n)) - 2
         self.k = k
 
         assert 2 ** self.k < self.n, 'k must be less than log_2(n)'
@@ -124,8 +128,13 @@ class RSA:
             base = (base * base) % mod
         return ans 
 
-    def _encode(self, data, key_e, key_n, key_k, data_split_size):
-        data = "".join(['{0:0=#10b}'.format(m)[2:] for m in data.encode('utf-8')])
+    def _encode(self, data, key_e, key_n, key_k):
+        data_split_size = len('{0:0=#b}'.format(key_n)) - 2
+        # print(data_split_size)
+        # print type(data.encode('utf-8')[0])
+        # print 'data_split_size %d' % data_split_size
+        data = "".join(['{0:0=#10b}'.format(int(m))[2:] for m in data.encode('utf-8')])
+        # print data
 
         # Add a different bit
         end_bit = '0'
@@ -135,6 +144,7 @@ class RSA:
         data += end_bit
         while (len(data) % key_k != 0):
             data += end_bit
+        # print data
 
         encrypt_data = [self.fast_power(int(data[i:i+key_k],2), key_e, key_n)  for i in range(0, len(data), key_k)]
         encrypt_data = ['{0:0=#{width}b}'.format(d, width=(data_split_size+2))[2:] for d in encrypt_data]
@@ -143,9 +153,10 @@ class RSA:
         return encrypt_data
 
     def encrypt_data(self, data):
-        return self._encode(data=data, key_e=self.e, key_n=self.n, key_k=self.k, data_split_size=self.data_split_size)
+        return self._encode(data=data, key_e=self.e, key_n=self.n, key_k=self.k)
 
-    def _decode(self, data, key_d, key_n, key_k, data_split_size):
+    def _decode(self, data, key_d, key_n, key_k):
+        data_split_size = len('{0:0=#b}'.format(key_n)) - 2
 
         decrypt_data = [data[i:i+data_split_size] for i in range(0, len(data), data_split_size)]
 
@@ -156,47 +167,54 @@ class RSA:
         while(decrypt_data[-1] == decrypt_data[-2]):
             decrypt_data = decrypt_data[:-1]
         decrypt_data = decrypt_data[:-1]
-        decrypt_data = [chr(int(decrypt_data[i:i+8], 2)) for i in range(0, len(decrypt_data), 8)]
+
+        if sys.version_info < (3, 0):
+            decrypt_data = [str(int(decrypt_data[i:i+8], 2)) for i in range(0, len(decrypt_data), 8)]
+        else:
+            decrypt_data = [chr(int(decrypt_data[i:i+8], 2)) for i in range(0, len(decrypt_data), 8)]
+
         decrypt_data = "".join(decrypt_data)
 
         return decrypt_data
     
     def decrypt_data(self, data):
-        return self._decode(data=data, key_d=self.d, key_n=self.n, key_k=self.k, data_split_size=self.data_split_size)
+        return self._decode(data=data, key_d=self.d, key_n=self.n, key_k=self.k)
+
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
+    # parser = argparse.ArgumentParser()
 
-    parser.add_argument('-p', dest='p', help='prime', type=int, default=9787)
-    parser.add_argument('-q', dest='q', help='prime', type=int, default=9791)
-    parser.add_argument('-k', dest='k', help='integer', type=int, default=20)
-    parser.add_argument('-e', dest='e', help='public exponent (default: %d)' % DEFAULT_EXP, type=int, default=DEFAULT_EXP)
-    parser.add_argument('-f', dest='format', help='output format (DER, PEM) (default: PEM)', default='PEM')
-    parser.add_argument('-v', dest='verbose', help='also display CRT-RSA representation', action='store_true', default=False)
+    # parser.add_argument('-p', dest='p', help='prime', type=int, default=9787)
+    # parser.add_argument('-q', dest='q', help='prime', type=int, default=9791)
+    # parser.add_argument('-k', dest='k', help='integer', type=int, default=20)
+    # parser.add_argument('-e', dest='e', help='public exponent (default: %d)' % 65537, type=int, default=65537)
+    # parser.add_argument('-f', dest='format', help='output format (DER, PEM) (default: PEM)', default='PEM')
+    # parser.add_argument('-v', dest='verbose', help='also display CRT-RSA representation', action='store_true', default=False)
 
 
-    try:
-        args = parser.parse_args()
+    # try:
+    #     args = parser.parse_args()
 
-        if args.p and args.q:
-            print('Using (p, q) to initialise RSA instance\n')
-            rsa = RSA(p=args.p, q=args.q, e=args.e, k=args.k)
-        else:
-            parser.print_help()
-            parser.error('(p, q) needs to be specified')
+    #     if args.p and args.q:
+    #         print('Using (p, q) to initialise RSA instance\n')
+    #         rsa = RSA(p=args.p, q=args.q, e=args.e, k=args.k)
+    #     else:
+    #         parser.print_help()
+    #         parser.error('(p, q) needs to be specified')
 
-        rsa.dump(args.verbose)
+    #     rsa.dump(args.verbose)
 
-        # print(rsa.fast_power(2,10,2000))
+    #     # print(rsa.fast_power(2,10,2000))
 
-        msg = "ABCDEFGHIJ"
+        rsa = RSA(p=9787, q=9791, e=65537, k=20)
+        msg = "1002017013684"
         encrypt = rsa.encrypt_data(msg)
         print("Encode: ", encrypt)
         decrypt = rsa.decrypt_data(encrypt)
         print("Decode: ", decrypt)
 
 
-    except argparse.ArgumentError as e:
-        parser.print_help()
-        parser.error(e.msg)
+    # except argparse.ArgumentError as e:
+    #     parser.print_help()
+    #     parser.error(e.msg)

@@ -3,5 +3,6 @@
     "server_port":8086,
     "local_port":1030,
     "password":"pwd",
-    "timeout":600
+    "timeout":600,
+    "des_key": "12345678"
 }
