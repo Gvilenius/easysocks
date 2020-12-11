@@ -145,6 +145,8 @@ class Socks5Server(SocketServer.StreamRequestHandler):
             addrtype = ord(self.decrypt(sock.recv(1)))      # receive addr type
             if addrtype == 1:
                 addr = socket.inet_ntoa(self.decrypt(self.rfile.read(4)))   # get dst addr
+            elif addrtype == 4:
+                addr = socket.inet_ntop(socket.AF_INET6, self.decrypt(self.rfile.read(16)))   # get dst addr
             elif addrtype == 3:
                 addr = self.decrypt(
                     self.rfile.read(ord(self.decrypt(sock.recv(1)))))       # read 1 byte of len, then get 'len' bytes name
@@ -155,7 +157,10 @@ class Socks5Server(SocketServer.StreamRequestHandler):
             port = struct.unpack('>H', self.decrypt(self.rfile.read(2)))    # get dst port into small endian
             try:
                 logging.info('connecting %s:%d' % (addr, port[0]))
-                remote = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                if addrtype == 4:
+                    remote = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+                else:
+                    remote = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 remote.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
                 remote.connect((addr, port[0]))         # connect to dst
             except socket.error, e:

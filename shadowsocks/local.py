@@ -2,9 +2,6 @@ import sys
 
 import gevent, gevent.monkey
 gevent.monkey.patch_all(dns=gevent.version_info[0]>=1)
-#from gevent import monkey
-#monkey.patch_all(dns=gevent.version_info[0]>=1)
-
 import socket
 import select
 import SocketServer
@@ -173,7 +170,7 @@ class Socks5Server(SocketServer.StreamRequestHandler):
             # dst addr
             addrtype = ord(data[3])       # indicate destination address type
             addr_to_send = data[3]
-            if addrtype == 1:             # IPv4
+            if addrtype == 1 :             # IPv4
                 addr_ip = self.rfile.read(4)            # 4 bytes IPv4 address (big endian)
                 addr = socket.inet_ntoa(addr_ip)
                 addr_to_send += addr_ip
@@ -181,8 +178,12 @@ class Socks5Server(SocketServer.StreamRequestHandler):
                 addr_len = self.rfile.read(1)           # Domain name's Length
                 addr = self.rfile.read(ord(addr_len))   # Followed by domain name(e.g. www.google.com)
                 addr_to_send += addr_len + addr
+            elif addrtype ==4:
+                addr_ip = self.rfile.read(16)
+                addr = socket.inet_ntop(socket.AF_INET6, addr_ip)
+                addr_to_send += addr_ip
             else:
-                logging.warn('addr_type not support')
+                logging.warn('addr_type notsupport')
                 # not support
                 return
 
