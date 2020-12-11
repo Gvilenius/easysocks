@@ -36,7 +36,7 @@ def send_all(sock, data):
             return bytes_sent
 
 
-def find_random_prime(lower_bound=1, upper_bound=20, seed=0):
+def find_random_prime(lower_bound=20, upper_bound=30, seed=0):
     assert (lower_bound >= 1), "Lower_bound must be no less than 1."
     np.random.seed(seed=seed)
     index = np.random.randint(lower_bound, upper_bound)
@@ -66,16 +66,18 @@ class Socks5Server(SocketServer.StreamRequestHandler):
                 r, w, e = select.select(fdset, [], [])
                 if sock in r:
                     data = sock.recv(4096)
+                    data = self.DES_decrypt(data)
                     if len(data) <= 0:
                         break
-                    result = send_all(remote, self.decrypt(data))
+                    result = send_all(remote, data)
                     if result < len(data):
                         raise Exception('failed to send all data')
                 if remote in r:
                     data = remote.recv(4096)
+                    data = self.DES_encrypt(data)
                     if len(data) <= 0:
                         break
-                    result = send_all(sock, self.encrypt(data))
+                    result = send_all(sock, data)
                     if result < len(data):
                         raise Exception('failed to send all data')
 
@@ -121,7 +123,7 @@ class Socks5Server(SocketServer.StreamRequestHandler):
             logging.info("Server exchange complete with DES key %s" % DES_KEY)
 
         except:
-            logging.info("close tcp")
+            logging.info("Finishing close tcp")
             sock.close()
             remote.close()
 
@@ -132,10 +134,10 @@ class Socks5Server(SocketServer.StreamRequestHandler):
         return data.translate(decrypt_table)
 
     def DES_encrypt(self, data):
-        return self.des_object.encrypt(data)
+        return self.des_obj.encrypt(data)
     
     def DES_decrypt(self, data):
-        return self.des_object.decrypt(data)
+        return self.des_obj.decrypt(data)
 
     def handle(self):
         try:

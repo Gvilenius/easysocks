@@ -70,21 +70,23 @@ class Socks5Server(SocketServer.StreamRequestHandler):
                 r, w, e = select.select(fdset, [], []) 
                 if sock in r:                               # if local socket is ready for reading
                     data = sock.recv(4096)
+                    data = self.DES_encrypt(data)
                     if len(data) <= 0:                      # received all data
                         break
-                    result = send_all(remote, self.encrypt(data))   # send data after encrypting
+                    result = send_all(remote, data)   # send data after encrypting
                     if result < len(data):
                         raise Exception('failed to send all data')
 
                 if remote in r:                             # remote socket(proxy) ready for reading
                     data = remote.recv(4096)
+                    data = self.DES_decrypt(data)
                     if len(data) <= 0:
                         break
-                    result = send_all(sock, self.decrypt(data))     # send to local socket(application)
+                    result = send_all(sock, data)     # send to local socket(application)
                     if result < len(data):
                         raise Exception('failed to send all data')
         finally:
-            logging.info("close tcp")
+            logging.info("Finishing close tcp")
             sock.close()
             remote.close()
     
@@ -105,6 +107,8 @@ class Socks5Server(SocketServer.StreamRequestHandler):
             # 3. identification check
             id_seq = str(np.random.randint(0,10000))
             id_msg = '2017013684'
+
+            logging.info("Client send id_data: %s" % id_seq+id_msg)
             
             id_data = self.rsa._encode(id_seq+id_msg, self.remote_pubkey[0], self.remote_pubkey[1], self.rsa.k)
             result = send_all(remote, id_data)
@@ -142,10 +146,10 @@ class Socks5Server(SocketServer.StreamRequestHandler):
         return data.translate(decrypt_table)
     
     def DES_encrypt(self, data):
-        return self.des_object.encrypt(data)
+        return self.des_obj.encrypt(data)
     
     def DES_decrypt(self, data):
-        return self.des_object.decrypt(data)
+        return self.des_obj.decrypt(data)
 
     def send_encrypt(self, sock, data):
         sock.send(self.encrypt(data))

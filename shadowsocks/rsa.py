@@ -16,9 +16,8 @@ PEM_TEMPLATE = '-----BEGIN RSA PRIVATE KEY-----\n%s-----END RSA PRIVATE KEY-----
 DEFAULT_EXP = 65537
 
 
-def find_random_prime(lower_bound=1, upper_bound=20, seed=0):
+def find_random_prime(lower_bound=10, upper_bound=20):
     assert (lower_bound >= 1), "Lower_bound must be no less than 1."
-    np.random.seed(seed=seed)
     index = np.random.randint(lower_bound, upper_bound)
 
     prime_list = []
@@ -35,10 +34,16 @@ def find_random_prime(lower_bound=1, upper_bound=20, seed=0):
         
 
 class RSA:
-    def __init__(self, p=9787, q=9791, e=65537, k=20):
+    def __init__(self, p=None, q=None, e=None, k=20):
         """
         Initialize RSA instance using primes (p, q)
         """
+        if not p:
+            p = find_random_prime(lower_bound=800, upper_bound=1200)
+        if not q:
+            q = find_random_prime(lower_bound=800, upper_bound=1200)
+        if not e:
+            e = find_random_prime(lower_bound=800, upper_bound=1200)
 
         self.e = e
 
