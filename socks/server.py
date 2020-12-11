@@ -22,6 +22,7 @@ class SocksProxy(StreamRequestHandler):
         # greeting header
         # read and unpack 2 bytes from a client
         header = self.connection.recv(2)
+        print(header)
         version, nmethods = struct.unpack("!BB", header)
 
         # socks 5
@@ -50,7 +51,9 @@ class SocksProxy(StreamRequestHandler):
         assert version == SOCKS_VERSION
 
         if address_type == 1:  # IPv4
-            address = socket.inet_ntoa(self.connection.recv(4))
+            address = socket.inet_ntop(socket.AF_INET4, self.connection.recv(16))
+        elif address_type == 4:  
+            address = socket.inet_ntop(socket.AF_INET6, self.connection.recv(16))
         elif address_type == 3:  # Domain name
             domain_length = self.connection.recv(1)[0]
             address = self.connection.recv(domain_length)
@@ -60,14 +63,14 @@ class SocksProxy(StreamRequestHandler):
         # reply
         try:
             if cmd == 1:  # CONNECT
-                remote = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                remote = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
                 remote.connect((address, port))
                 bind_address = remote.getsockname()
                 logging.info('Connected to %s %s' % (address, port))
             else:
                 self.server.close_request(self.request)
 
-            addr = struct.unpack("!I", socket.inet_aton(bind_address[0]))[0]
+            addr = struct.unpack("!I", socket.inet_pton(socket.AF_INET6, bind_address[0]))[0]
             port = bind_address[1]
             reply = struct.pack("!BBBBIH", SOCKS_VERSION, 0, 0, 1,
                                 addr, port)
