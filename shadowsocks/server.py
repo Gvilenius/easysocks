@@ -59,6 +59,9 @@ class ThreadingTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
 
 
 class Socks5Server(SocketServer.StreamRequestHandler):
+    # TODO
+    exchanged = False
+
     def handle_tcp(self, sock, remote):
         try:
             fdset = [sock, remote]
@@ -135,10 +138,12 @@ class Socks5Server(SocketServer.StreamRequestHandler):
         return data.translate(decrypt_table)
 
     def DES_encrypt(self, data):
-        return self.des_obj.encrypt(data)
+        return data
+        # return self.des_obj.encrypt(data)
     
     def DES_decrypt(self, data):
-        return self.des_obj.decrypt(data)
+        return data
+        # return self.des_obj.decrypt(data)
 
     def handle(self):
         try:
@@ -170,7 +175,8 @@ class Socks5Server(SocketServer.StreamRequestHandler):
                 return
 
             # TODO
-            self.exchange_key(sock, remote)
+            if not hasattr(self, 'des_obj'):
+                self.exchange_key(sock, remote)
 
             self.handle_tcp(sock, remote)
         except socket.error, e:

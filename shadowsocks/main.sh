@@ -1,6 +1,8 @@
 #!/bin/bash
 
 # killall python2 process
+# kill -9 "$(lsof -i:1030 -t)"
+# kill -9 "$(lsof -i:8086 -t)"
 killall python2
 
 # start the local proxy

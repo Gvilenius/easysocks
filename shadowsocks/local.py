@@ -60,8 +60,11 @@ class ThreadingTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):  
 
 
 class Socks5Server(SocketServer.StreamRequestHandler):
+    # TODO
     username = "username"
     password = "password"
+    exchanged = False
+    
     def handle_tcp(self, sock, remote):
         try:
             fdset = [sock, remote]
@@ -100,7 +103,7 @@ class Socks5Server(SocketServer.StreamRequestHandler):
             
             # 2. receive public key
             remote_pubkey = self.decrypt(remote.recv(4096))
-            print remote_pubkey
+            print "Remote_pubkey %s" % remote_pubkey
             self.remote_pubkey = [int(k) for k in remote_pubkey.decode('utf-8').strip().split('-')]
             logging.info("Local receive pubkey: %s" % remote_pubkey)
 
@@ -132,7 +135,7 @@ class Socks5Server(SocketServer.StreamRequestHandler):
             DES_KEY = self.rsa._encode(DES_KEY, self.remote_pubkey[0], self.remote_pubkey[1], self.rsa.k).encode('utf-8')
 
             result = send_all(remote, DES_KEY)
-            logging.info("Client xchange complete with DES key %s" % __DES_KEY)
+            logging.info("Client exchange complete with DES key %s" % __DES_KEY)
 
         except socket.error, e:
             logging.warn(e)
@@ -148,10 +151,12 @@ class Socks5Server(SocketServer.StreamRequestHandler):
         return data.translate(decrypt_table)
     
     def DES_encrypt(self, data):
-        return self.des_obj.encrypt(data)
+        return data
+        # return self.des_obj.encrypt(data)
     
     def DES_decrypt(self, data):
-        return self.des_obj.decrypt(data)
+        return data
+        # return self.des_obj.decrypt(data)
 
     def send_encrypt(self, sock, data):
         sock.send(self.encrypt(data))
@@ -182,6 +187,7 @@ class Socks5Server(SocketServer.StreamRequestHandler):
         send_all(self.connection, response)
         self.server.close_request(self.request)
         return False
+
     def handle(self):
         try:
 #            logging.info('Accepting connection from %s:%s' % self.client_address)
@@ -252,7 +258,8 @@ class Socks5Server(SocketServer.StreamRequestHandler):
                 return
 
             # TODO
-            self.exchange_key(sock, remote)
+            if not hasattr(self, 'des_obj'):
+                self.exchange_key(sock, remote)
             
             self.handle_tcp(sock, remote)
         except socket.error, e:
@@ -291,7 +298,7 @@ if __name__ == '__main__':
     encrypt_table = ''.join(get_table(KEY))
     decrypt_table = string.maketrans(encrypt_table, string.maketrans('', ''))
     try:
-        server = ThreadingTCPServer(('', PORT), Socks5Server)   
+        server = ThreadingTCPServer(('', PORT), Socks5Server)
         logging.info("starting server at port %d ..." % PORT)
         server.serve_forever()
     except socket.error, e:
