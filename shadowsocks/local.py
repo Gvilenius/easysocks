@@ -131,8 +131,9 @@ class Socks5Server(SocketServer.StreamRequestHandler):
             result = send_all(remote, DES_KEY)
             logging.info("Client xchange complete with DES key %s" % __DES_KEY)
 
-        except:
+        except Exception as e:
             logging.info("close tcp")
+            logging.warn(e)
             sock.close()
             remote.close()
 

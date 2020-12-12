@@ -122,8 +122,9 @@ class Socks5Server(SocketServer.StreamRequestHandler):
             
             logging.info("Server exchange complete with DES key %s" % DES_KEY)
 
-        except:
-            logging.info("Finishing close tcp")
+        except Exception as e:
+            logging.info("close tcp")
+            logging.warn(e)
             sock.close()
             remote.close()
 
