@@ -103,7 +103,6 @@ class Socks5Server(SocketServer.StreamRequestHandler):
             
             # 2. receive public key
             remote_pubkey = self.decrypt(remote.recv(4096))
-            print "Remote_pubkey %s" % remote_pubkey
             self.remote_pubkey = [int(k) for k in remote_pubkey.decode('utf-8').strip().split('-')]
             logging.info("Local receive pubkey: %s" % remote_pubkey)
 
@@ -126,7 +125,6 @@ class Socks5Server(SocketServer.StreamRequestHandler):
 
             # 4. exchange des key
             DES_KEY = str(np.random.randint(10000000, 100000000))
-            self.des_obj = des(DES_KEY, ECB, DES_KEY, padmode=PAD_PKCS5)
 
             __DES_KEY = DES_KEY
             ## encrypt by private A
@@ -136,6 +134,7 @@ class Socks5Server(SocketServer.StreamRequestHandler):
 
             result = send_all(remote, DES_KEY)
             logging.info("Client exchange complete with DES key %s" % __DES_KEY)
+            return __DES_KEY
 
         except socket.error, e:
             logging.warn(e)
@@ -143,6 +142,8 @@ class Socks5Server(SocketServer.StreamRequestHandler):
             logging.warn(e)
             sock.close()
             remote.close()
+            # For safety
+            return "12345678"
 
     def encrypt(self, data):
         return data.translate(encrypt_table)
@@ -151,12 +152,10 @@ class Socks5Server(SocketServer.StreamRequestHandler):
         return data.translate(decrypt_table)
     
     def DES_encrypt(self, data):
-        return data
-        # return self.des_obj.encrypt(data)
+        return data.translate(self.new_encrypt_table)
     
     def DES_decrypt(self, data):
-        return data
-        # return self.des_obj.decrypt(data)
+        return data.translate(self.new_decrypt_table)
 
     def send_encrypt(self, sock, data):
         sock.send(self.encrypt(data))
@@ -166,6 +165,7 @@ class Socks5Server(SocketServer.StreamRequestHandler):
         for i in range(n):
             methods.append(ord(self.connection.recv(1)))
         return methods
+
     def verify_credentials(self):
         version = ord(self.connection.recv(1))
         assert version == 1
@@ -257,9 +257,10 @@ class Socks5Server(SocketServer.StreamRequestHandler):
                 logging.warn(e)
                 return
 
-            # TODO
-            if not hasattr(self, 'des_obj'):
-                self.exchange_key(sock, remote)
+            # Only exchange key for the first time.
+            DES_KEY = self.exchange_key(sock, remote)
+            self.new_encrypt_table = ''.join(get_table(DES_KEY))
+            self.new_decrypt_table = string.maketrans(self.new_encrypt_table, string.maketrans('', ''))
             
             self.handle_tcp(sock, remote)
         except socket.error, e:
@@ -297,6 +298,7 @@ if __name__ == '__main__':
 
     encrypt_table = ''.join(get_table(KEY))
     decrypt_table = string.maketrans(encrypt_table, string.maketrans('', ''))
+
     try:
         server = ThreadingTCPServer(('', PORT), Socks5Server)
         logging.info("starting server at port %d ..." % PORT)

@@ -121,15 +121,17 @@ class Socks5Server(SocketServer.StreamRequestHandler):
             DES_KEY = self.rsa._decode(DES_KEY, self.rsa.d, self.rsa.n, self.rsa.k)
             ## decrypt by public A
             DES_KEY = self.rsa._decode(DES_KEY, self.remote_pubkey[0], self.remote_pubkey[1], self.rsa.k)
-            self.des_obj = des(DES_KEY, ECB, DES_KEY, padmode=PAD_PKCS5)
             
             logging.info("Server exchange complete with DES key %s" % DES_KEY)
+            return DES_KEY
 
         except socket.error, e:
             logging.warn(e)
             logging.info("Close tcp")
             sock.close()
             remote.close()
+            # For safety
+            return "12345678"
 
     def encrypt(self, data):
         return data.translate(encrypt_table)
@@ -138,12 +140,10 @@ class Socks5Server(SocketServer.StreamRequestHandler):
         return data.translate(decrypt_table)
 
     def DES_encrypt(self, data):
-        return data
-        # return self.des_obj.encrypt(data)
+        return data.translate(self.new_encrypt_table)
     
     def DES_decrypt(self, data):
-        return data
-        # return self.des_obj.decrypt(data)
+        return data.translate(self.new_decrypt_table)
 
     def handle(self):
         try:
@@ -174,13 +174,16 @@ class Socks5Server(SocketServer.StreamRequestHandler):
                 logging.warn(e)
                 return
 
-            # TODO
-            if not hasattr(self, 'des_obj'):
-                self.exchange_key(sock, remote)
-
+            # # TODO
+            DES_KEY = self.exchange_key(sock, remote)
+            self.new_encrypt_table = ''.join(get_table(DES_KEY))
+            self.new_decrypt_table = string.maketrans(self.new_encrypt_table, string.maketrans('', ''))
+            
             self.handle_tcp(sock, remote)
         except socket.error, e:
             logging.warn(e)
+
+
 def readConfig():
     with open('config.json', 'rb') as f:
         config = json.load(f)
@@ -208,6 +211,7 @@ if __name__ == '__main__':
 
     encrypt_table = ''.join(get_table(KEY))
     decrypt_table = string.maketrans(encrypt_table, string.maketrans('', ''))
+
     try:
         server = ThreadingTCPServer(('', PORT), Socks5Server)
         logging.info("starting server at port %d ..." % PORT)
