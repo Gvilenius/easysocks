@@ -1,5 +1,4 @@
 import sys
-
 import gevent, gevent.monkey
 gevent.monkey.patch_all(dns=gevent.version_info[0]>=1)
 import socket
@@ -12,6 +11,7 @@ import os
 import json
 import logging
 import getopt
+SOCKS_VERSION=5
 from pyDes import des, PAD_PKCS5, ECB
 from rsa import RSA
 import numpy as np
@@ -56,10 +56,12 @@ def find_random_prime(lower_bound=1, upper_bound=20, seed=0):
 
 
 class ThreadingTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):   # Multiple inheritance
-    allow_reuse_address = True
+   allow_reuse_address = True
 
 
 class Socks5Server(SocketServer.StreamRequestHandler):
+    username = "username"
+    password = "password"
     def handle_tcp(self, sock, remote):
         try:
             fdset = [sock, remote]
@@ -97,7 +99,8 @@ class Socks5Server(SocketServer.StreamRequestHandler):
             result = send_all(remote, self.encrypt(pub_key))
             
             # 2. receive public key
-            remote_pubkey = self.decrypt(remote.recv(4096)).decode('utf-8')
+            remote_pubkey = self.decrypt(remote.recv(4096))
+            print remote_pubkey
             self.remote_pubkey = [int(k) for k in remote_pubkey.decode('utf-8').strip().split('-')]
             logging.info("Local receive pubkey: %s" % remote_pubkey)
 
@@ -131,8 +134,9 @@ class Socks5Server(SocketServer.StreamRequestHandler):
             result = send_all(remote, DES_KEY)
             logging.info("Client xchange complete with DES key %s" % __DES_KEY)
 
-        except Exception as e:
-            logging.info("close tcp")
+        except socket.error, e:
+            logging.warn(e)
+            logging.info("Close tcp")
             logging.warn(e)
             sock.close()
             remote.close()
@@ -152,17 +156,55 @@ class Socks5Server(SocketServer.StreamRequestHandler):
     def send_encrypt(self, sock, data):
         sock.send(self.encrypt(data))
 
+    def get_available_methods(self, n):
+        methods = []
+        for i in range(n):
+            methods.append(ord(self.connection.recv(1)))
+        return methods
+    def verify_credentials(self):
+        version = ord(self.connection.recv(1))
+        assert version == 1
+
+        username_len = ord(self.connection.recv(1))
+        username = self.connection.recv(username_len).decode('utf-8')
+
+        password_len = ord(self.connection.recv(1))
+        password = self.connection.recv(password_len).decode('utf-8')
+
+        if username == self.username and password == self.password:
+            # success, status = 0
+            response = struct.pack("!BB", version, 0)
+            send_all(self.connection, response)
+            return True
+
+        # failure, status != 0
+        response = struct.pack("!BB", version, 0xFF)
+        send_all(self.connection, response)
+        self.server.close_request(self.request)
+        return False
     def handle(self):
         try:
+#            logging.info('Accepting connection from %s:%s' % self.client_address)
+            header = self.connection.recv(2)
+            version, nmethods = struct.unpack("!BB", header)
+            assert version == SOCKS_VERSION
+            assert nmethods > 0
+#
+        # get available methods
+            methods = self.get_available_methods(nmethods)
+
+#            sock.recv(262)                # Sock5 Verification packet
+            if 2 not in set(methods):
+                self.server.close_request(self.request)
+                return
             sock = self.connection        # local socket [127.1:port]
-            sock.recv(262)                # Sock5 Verification packet
-            sock.send("\x05\x00")         # Sock5 Response: '0x05' Version 5; '0x00' NO AUTHENTICATION REQUIRED
+            sock.send("\x05\x02")         # Sock5 Response: '0x05' Version 5; '0x00' NO AUTHENTICATION REQUIRED
             # After Authentication negotiation
-
+            if not self.verify_credentials():
+                logging.warn("credential fail")
+                return
             data = self.rfile.read(4)     # Forward request format: VER CMD RSV ATYP (4 bytes)
-
             # CMD == 0x01 (connect)
-            logging.info(data)
             mode = ord(data[1])           
             logging.info('mode=' + str(mode))
             if mode != 1:
