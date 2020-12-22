@@ -96,6 +96,7 @@ class Socks5Server(SocketServer.StreamRequestHandler):
         self.rsa = RSA()
         try:
             # 1. send public key
+            print("RSA KEY", self.rsa.e, self.rsa.n)
             pub_key = (self.rsa.get_stringfied(self.rsa.e) + '-' + self.rsa.get_stringfied(self.rsa.n)).encode('utf-8')
 
             result = send_all(remote, self.encrypt(pub_key))
@@ -103,7 +104,7 @@ class Socks5Server(SocketServer.StreamRequestHandler):
             # 2. receive public key
             remote_pubkey = self.decrypt(remote.recv(4096))
             self.remote_pubkey = [self.rsa.unstringfied(k) for k in remote_pubkey.decode('utf-8').strip().split('-')]
-            logging.info("Local receive pubkey: %s" % remote_pubkey)
+            logging.info("Local receive pubkey: %s" % self.remote_pubkey)
 
             # 3. identification check
             id_seq = str(np.random.randint(0,10000))
