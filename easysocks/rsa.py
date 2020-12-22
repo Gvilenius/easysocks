@@ -39,11 +39,11 @@ class RSA:
         Initialize RSA instance using primes (p, q)
         """
         if not p:
-            p = find_random_prime(lower_bound=800, upper_bound=1200)
+            p = find_random_prime(lower_bound=80000, upper_bound=120000)
         if not q:
-            q = find_random_prime(lower_bound=800, upper_bound=1200)
+            q = find_random_prime(lower_bound=80000, upper_bound=120000)
         if not e:
-            e = find_random_prime(lower_bound=800, upper_bound=1200)
+            e = find_random_prime(lower_bound=80000, upper_bound=120000)
 
         self.e = e
 
@@ -65,8 +65,6 @@ class RSA:
         self._calc_values()
 
     def _calc_values(self):
-        
-
         if self.p != self.q:
             phi = (self.p - 1) * (self.q - 1)
         else:
@@ -179,6 +177,23 @@ class RSA:
     
     def decrypt_data(self, data):
         return self._decode(data=data, key_d=self.d, key_n=self.n, key_k=self.k)
+    
+    def get_stringfied(self, value, interval=7):
+        width = len(bin(value))-2
+        width = width + (interval - width%interval) + 2
+        stringfied = "{0:0=#{width}b}".format(value, width=width)[2:]
+        result = ""
+        for i in range(0, len(stringfied), interval):
+            result += chr(int(stringfied[i:i+interval], 2))
+        return result
+    
+    def unstringfied(self, string, interval=7):
+        value = ""
+        for c in string:
+            value += "{0:0=#{width}b}".format(ord(c), width=interval+2)[2:]
+        result = int(value, 2)
+        return result
+
 
 
 
