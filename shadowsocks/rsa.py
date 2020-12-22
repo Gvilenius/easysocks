@@ -39,11 +39,11 @@ class RSA:
         Initialize RSA instance using primes (p, q)
         """
         if not p:
-            p = find_random_prime(lower_bound=800, upper_bound=1200)
+            p = find_random_prime(lower_bound=80000, upper_bound=120000)
         if not q:
-            q = find_random_prime(lower_bound=800, upper_bound=1200)
+            q = find_random_prime(lower_bound=80000, upper_bound=120000)
         if not e:
-            e = find_random_prime(lower_bound=800, upper_bound=1200)
+            e = find_random_prime(lower_bound=80000, upper_bound=120000)
 
         self.e = e
 
