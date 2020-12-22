@@ -65,8 +65,6 @@ class RSA:
         self._calc_values()
 
     def _calc_values(self):
-        
-
         if self.p != self.q:
             phi = (self.p - 1) * (self.q - 1)
         else:
@@ -179,6 +177,23 @@ class RSA:
     
     def decrypt_data(self, data):
         return self._decode(data=data, key_d=self.d, key_n=self.n, key_k=self.k)
+    
+    def get_stringfied(self, value, interval=8):
+        width = len(bin(value))-2
+        width = width + (interval - width%interval) + 2
+        stringfied = "{0:0=#{width}b}".format(value, width=width)[2:]
+        result = ""
+        for i in range(0, len(stringfied), gap):
+            result += chr(int(stringfied[i:i+gap], 2))
+        return result
+    
+    def unstringfied(self, string, interval=8):
+        value = ""
+        for c in string:
+            value += "{0:0=#{width}b}".format(ord(c), width=interval)[2:]
+        result = int(value,2)
+        return result
+
 
 
 

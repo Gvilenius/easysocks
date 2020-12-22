@@ -93,11 +93,11 @@ class Socks5Server(SocketServer.StreamRequestHandler):
         try:
             # 1. receive public key
             remote_pubkey = self.decrypt(sock.recv(4096)).decode('utf-8')
-            self.remote_pubkey = [int(k) for k in remote_pubkey.decode('utf-8').strip().split('-')]
+            self.remote_pubkey = [self.rsa.unstringfied(k) for k in remote_pubkey.decode('utf-8').strip().split('-')]
             logging.info("Server receive pubkey: %s" % remote_pubkey)
 
             # 2. send public key
-            pub_key = (str(self.rsa.e) + '-' + str(self.rsa.n)).encode('utf-8')
+            pub_key = (self.rsa.get_stringfied(self.rsa.e) + '-' + self.rsa.get_stringfied(self.rsa.n)).encode('utf-8')
 
             result = send_all(sock, self.encrypt(pub_key))
             
